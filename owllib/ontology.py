@@ -20,7 +20,9 @@ class Ontology:
 		self.graph = Graph()
 
 		# if we have no uri, we create a bnode
-		if not uri:
+		if uri:
+			self.uri = uri
+		else:
 			self.uri = BNode()
 
 		self.graph.add((self.uri, RDF.type, OWL.Ontology))
