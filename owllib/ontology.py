@@ -48,6 +48,25 @@ class Ontology:
 		self.annotation_properties = set()
 		self.data_properties = set()
 
+	def addRelation(self, s, p, o, sync=False):
+		triple = (s.uri, p, o.uri)
+		s.triples.add(triple)
+		o.triples.add(triple)
+		if sync:
+			self.sync_entity_to_graph(s)
+			self.sync_entity_to_graph(o)
+
+	def addSubRelation(self, child, relation, parent, sync=False):
+		self.addRelation(child, relation, parent, sync)
+		child.parents.add(parent)
+		parent.children.add(child)
+
+	def linkSubClass(self, child, parent, sync=False):
+		self.addRelation(child, RDFS.subClassOf, parent, sync)
+
+	def linkSubProperty(self, child, parent, sync=False):
+		self.addRelation(child, RDFS.subProperty, parent, sync)
+
 	# read-only properties
 	@property
 	def entities(self):
