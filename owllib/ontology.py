@@ -1,4 +1,4 @@
-from rdflib import Graph, BNode, URIRef
+from rdflib import Graph, BNode, URIRef, RDF, RDFS, OWL
 
 from owllib.entities import *
 
@@ -68,6 +68,11 @@ class Ontology:
 
 		# adding triples from entity to graph
 		to_add = entity.triples
+		to_add.add((entity.uri, RDF.type, entity.get_type()))
+		for label in entity.labels:
+			to_add.add((entity.uri, RDFS.label, label))
+		for comment in entity.comments:
+			to_add.add((entity.uri, RDFS.comment, comment))
 
 		for triple in to_add:
 			self.graph.add(triple)

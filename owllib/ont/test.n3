@@ -1,0 +1,24 @@
+@prefix : <http://www.semanticweb.org/luciferz2012/ontologies/2015/0/untitled-ontology-75#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<123> a owl:Class ;
+    rdfs:label "测试"@zh-hans .
+
+<http://www.semanticweb.org/luciferz2012/ontologies/2015/0/untitled-ontology-75> a owl:Ontology .
+
+:c2 a owl:Class ;
+    rdfs:label "PinYin2"@en,
+        "中文2"@zh-hans ;
+    rdfs:subClassOf :c1 .
+
+:individual1 a :c1,
+        owl:NamedIndividual .
+
+:c1 a owl:Class ;
+    rdfs:label "PinYin1"@en,
+        "中文1"@zh-hans .
+

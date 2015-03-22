@@ -56,6 +56,9 @@ class Entity:
 		"""
 		self.ontology.sync_entity_to_graph(self)
 
+	def get_type(self):
+		raise NotImplementedError
+
 	def _get_parents(self):
 		raise NotImplementedError
 
@@ -77,6 +80,9 @@ class Class(Entity):
 
 	def __init__(self, uri=None, ontology=None, labels=None, comments=None):
 		super(Class, self).__init__(uri, ontology, labels, comments)
+
+	def get_type(self):
+		return rdflib.OWL.Class
 
 	def _get_parents(self):
 		"""
@@ -108,6 +114,9 @@ class Individual(Entity):
 
 	def __init__(self, uri=None, ontology=None, labels=None, comments=None):
 		super(Individual, self).__init__(uri, ontology, labels, comments)
+
+	def get_type(self):
+		return rdflib.OWL.NamedIndividual
 
 	def _get_parents(self):
 		"""
@@ -166,6 +175,9 @@ class ObjectProperty(Property):
 	def __init__(self, uri=None, ontology=None, labels=None, comments=None):
 		super(ObjectProperty, self).__init__(uri, ontology, labels, comments)
 
+	def get_type(self):
+		return rdflib.OWL.ObjectProperty
+
 
 class DataProperty(Property):
 	"""
@@ -175,6 +187,9 @@ class DataProperty(Property):
 	def __init__(self, uri=None, ontology=None, labels=None, comments=None):
 		super(DataProperty, self).__init__(uri, ontology, labels, comments)
 
+	def get_type(self):
+		return rdflib.OWL.DatatypeProperty
+
 
 class AnnotationProperty(Property):
 	"""
@@ -183,4 +198,7 @@ class AnnotationProperty(Property):
 
 	def __init__(self, uri=None, ontology=None, labels=None, comments=None):
 		super(AnnotationProperty, self).__init__(uri, ontology, labels, comments)
+
+	def get_type(self):
+		return rdflib.OWL.AnnotationProperty
 
