@@ -1,4 +1,5 @@
 from rdflib import Graph, BNode, URIRef, RDF, RDFS, OWL
+from rdflib import Literal
 
 from owllib.entities import *
 
