@@ -4,6 +4,14 @@ from rdflib import Literal
 from owllib.entities import *
 
 
+def addListItem(containerClass, first, contentClass, rest):
+	triple = (first, RDF.first, contentClass.uri)
+	containerClass.triples.add(triple)
+	contentClass.triples.add(triple)
+	containerClass.triples.add((first, RDF.rest, rest))
+	return rest
+
+
 class Ontology:
 	"""
 	A class representing an Ontology
@@ -55,6 +63,14 @@ class Ontology:
 		if sync:
 			self.sync_entity_to_graph(s)
 			self.sync_entity_to_graph(o)
+
+	def defineUnion(self, unionClass, classList):
+		first = BNode()
+		unionClass.triples.add((unionClass.uri, OWL.unionOf, first))
+		for owlClass in classList[:-1]:
+			first = addListItem(unionClass, first, owlClass, BNode())
+		addListItem(unionClass, first, classList[-1], RDF.nil)
+		return unionClass
 
 	def addSubRelation(self, child, relation, parent, sync=False):
 		self.addRelation(child, relation, parent, sync)
