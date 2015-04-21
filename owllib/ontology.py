@@ -148,7 +148,7 @@ class Ontology:
         self.classes = self._load_classes()
         self.individuals = self._load_individuals()
         self.object_properties = self._load_object_properties()
-        self.annotation_properties = self._load_object_properties()
+        self.annotation_properties = self._load_annotation_properties()
         self.data_properties = self._load_data_properties()
 
         # TODO very slow for large ontologies; find more efficient way
