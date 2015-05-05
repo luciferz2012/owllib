@@ -2,10 +2,20 @@
 from rdflib import Graph
 from rdflib.term import BNode
 from rdflib import RDF, OWL
+from rdflib.util import guess_format
 
 
 class OWLEntity:
-	# get IRI
+	def __init__(self, IRI=None):
+		if IRI:
+			self._IRI = IRI
+		else:
+			self._IRI = BNode()
+
+	@property
+	def IRI(self):
+		return self._IRI
+
 	def getAnnotationProperties(self, annotationProperty=None):
 		raise NotImplementedError
 
@@ -88,31 +98,38 @@ class OWLObjectProperty(OWLProperty):
 		raise NotImplementedError
 
 
-class OWLOntology:
-	# get IRI
+class OWLOntology(OWLEntity):
 	def __init__(self, IRI=None, versionIRI=None):
+		super(OWLOntology, self).__init__(IRI)
 		self.graph = Graph()
-		if IRI:
-			self._IRI = IRI
-		else:
-			self._IRI = BNode()
 		self.graph.add((self._IRI, RDF.type, OWL.Ontology))
 		if versionIRI:
 			self.graph.add((IRI, OWL.versionIRI, versionIRI))
+		self._directImports = None
 
-	def load(self, owlFormat, file=None, location=None, data=None):
+	def load(self, file=None, location=None, data=None, owlFormat=None):
+		if location and not owlFormat:
+			owlFormat = guess_format(location)
 		self.graph.parse(format=owlFormat, file=file, location=location, data=data)
+		maxNumOfTriples = 0
+		for IRI in self.graph.subjects(RDF.type, OWL.Ontology):
+			triples = [(p, o) for (p, o) in self.graph.predicate_objects(IRI)]
+			if maxNumOfTriples < len(triples):
+				maxNumOfTriples = len(triples)
+				self._IRI = IRI
 
 	def save(self):
 		raise NotImplementedError
 
 	@property
-	def annotationProperties(self):
-		raise NotImplementedError
-
-	@property
 	def directImports(self):
-		raise NotImplementedError
+		if not self._directImports:
+			self._directImports = set()
+			for IRI in self.graph.objects(self.IRI, OWL.imports):
+				ont = OWLOntology()
+				ont.load(location=IRI)
+				self._directImports.add(ont)
+		return self._directImports
 
 	@property
 	def imports(self):
