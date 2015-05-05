@@ -1,127 +1,147 @@
+# coding=utf-8
+from rdflib import Graph
+from rdflib.term import BNode
+from rdflib import RDF, OWL
+
+
 class OWLEntity:
-    # getIRI
-    def getAnnotationProperties(self, annotationProperty=None):
-        raise NotImplementedError
+	# get IRI
+	def getAnnotationProperties(self, annotationProperty=None):
+		raise NotImplementedError
+
+
+class OWLAnnotationProperty:
+	# isComment
+	# isDeprecated
+	# isLabel
+	pass
 
 
 class OWLClass(OWLEntity):
-    def getIndividuals(self, ontologySet):
-        raise NotImplementedError
+	# set ontologySet
+	@property
+	def individuals(self):
+		raise NotImplementedError
 
-    def getSubClasses(self, ontologySet):
-        raise NotImplementedError
+	@property
+	def subClasses(self):
+		raise NotImplementedError
 
-    def getSuperClasses(self, ontologySet):
-        raise NotImplementedError
+	@property
+	def superClasses(self):
+		raise NotImplementedError
 
 
 class OWLIndividual(OWLEntity):
-    def getDataProperties(self, ontology, dataProperty=None):
-        raise NotImplementedError
+	# set ontology
+	def getDataProperties(self, dataProperty=None):
+		raise NotImplementedError
 
-    def getObjectProperties(self, ontology, objectProperty=None):
-        raise NotImplementedError
+	def getObjectProperties(self, objectProperty=None):
+		raise NotImplementedError
 
 
 class OWLProperty(OWLEntity):
-    def getDomains(self, ontologySet):
-        raise NotImplementedError
+	# set ontologySet
+	@property
+	def domains(self):
+		raise NotImplementedError
 
-    def getRanges(self, ontologySet):
-        raise NotImplementedError
+	@property
+	def ranges(self):
+		raise NotImplementedError
 
-    def getSubProperties(self, ontologySet):
-        raise NotImplementedError
+	@property
+	def subProperties(self):
+		raise NotImplementedError
 
-    def getSuperProperties(self, ontologySet):
-        raise NotImplementedError
+	@property
+	def superProperties(self):
+		raise NotImplementedError
 
 
 class OWLDataProperty(OWLProperty):
-    pass
+	pass
 
 
 class OWLObjectProperty(OWLProperty):
-    def getInverses(self, ontologySet):
-        raise NotImplementedError
+	@property
+	def inverses(self):
+		raise NotImplementedError
 
-    def isAsymmetric(self, ontolgySet):
-        raise NotImplementedError
+	def isAsymmetric(self):
+		raise NotImplementedError
 
-    def isInverseFunctional(self, ontologySet):
-        raise NotImplementedError
+	def isInverseFunctional(self):
+		raise NotImplementedError
 
-    def isIrreflexive(self, ontologySet):
-        raise NotImplementedError
+	def isIrreflexive(self):
+		raise NotImplementedError
 
-    def isReflexive(self, ontologySet):
-        raise NotImplementedError
+	def isReflexive(self):
+		raise NotImplementedError
 
-    def isSymmetric(self, ontologySet):
-        raise NotImplementedError
+	def isSymmetric(self):
+		raise NotImplementedError
 
-    def isTransitive(self, ontologySet):
-        raise NotImplementedError
-
-
-class OWLAnnotationProperty(OWLEntity):
-    # isComment
-    # isDeprecated
-    # isLabel
-    pass
+	def isTransitive(self):
+		raise NotImplementedError
 
 
 class OWLOntology:
-    # getIRI
-    def getAnnotationProperties(self):
-        raise NotImplementedError
+	# get IRI
+	def __init__(self, IRI=None, versionIRI=None):
+		self.graph = Graph()
+		if IRI:
+			self._IRI = IRI
+		else:
+			self._IRI = BNode()
+		self.graph.add((self._IRI, RDF.type, OWL.Ontology))
+		if versionIRI:
+			self.graph.add((IRI, OWL.versionIRI, versionIRI))
 
-    def getDirectImports(self):
-        raise NotImplementedError
+	def load(self, owlFormat, file=None, location=None, data=None):
+		self.graph.parse(format=owlFormat, file=file, location=location, data=data)
 
-    def getImports(self):
-        raise NotImplementedError
+	def save(self):
+		raise NotImplementedError
 
-    def getOntologyManager(self):
-        raise NotImplementedError
+	@property
+	def annotationProperties(self):
+		raise NotImplementedError
 
-    def getAllEntities(self):
-        raise NotImplementedError
+	@property
+	def directImports(self):
+		raise NotImplementedError
 
-    def getAllClasses(self):
-        raise NotImplementedError
+	@property
+	def imports(self):
+		raise NotImplementedError
 
-    def getAllIndividuals(self):
-        raise NotImplementedError
+	@property
+	def ontologyManager(self):
+		raise NotImplementedError
 
-    def getAllDataProperties(self):
-        raise NotImplementedError
+	@property
+	def allEntities(self):
+		raise NotImplementedError
 
-    def getAllObjectProperties(self):
-        raise NotImplementedError
+	@property
+	def allClasses(self):
+		raise NotImplementedError
 
-    def getAllAnnotationProperties(self):
-        raise NotImplementedError
+	@property
+	def allIndividuals(self):
+		raise NotImplementedError
 
+	@property
+	def allDataProperties(self):
+		raise NotImplementedError
 
-class OWLOntologyManager:
-    def createOntology(self, IRI):
-        raise NotImplementedError
+	@property
+	def allObjectProperties(self):
+		raise NotImplementedError
 
-    def getDirectImports(self, ontology):
-        raise NotImplementedError
-
-    def getImports(self, ontology):
-        raise NotImplementedError
-
-    def getOntology(self, IRI):
-        raise NotImplementedError
-
-    def loadOntology(self, IRI):
-        raise NotImplementedError
-
-    def removeOntology(self, ontology):
-        raise NotImplementedError
-
-    def saveOntology(self, ontology, IRI, ontologyFormat):
-        raise NotImplementedError
+	@property
+	def allAnnotationProperties(self):
+		raise NotImplementedError
