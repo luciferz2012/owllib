@@ -1,21 +1,25 @@
 # coding=utf-8
+
 from rdflib import Graph
 from rdflib.term import BNode
-from rdflib import RDF, OWL
+from rdflib import RDF, RDFS, OWL
 from rdflib.util import guess_format
 from rdflib.plugin import PluginException
 
 
-class OWLEntity:
+class OWLObject:
 	def __init__(self, IRI=None):
 		if IRI:
-			self._IRI = IRI
+			self.__IRI = IRI
 		else:
-			self._IRI = BNode()
+			self.__IRI = BNode()
 
 	@property
 	def IRI(self):
-		return self._IRI
+		return self.__IRI
+
+	def __str__(self):
+		return self.IRI
 
 	def getAnnotationProperties(self, annotationProperty=None):
 		raise NotImplementedError
@@ -28,23 +32,58 @@ class OWLAnnotationProperty:
 	pass
 
 
-class OWLClass(OWLEntity):
-	# set ontologySet
-	@property
-	def individuals(self):
-		raise NotImplementedError
+class OWLEntity(OWLObject):
+	def __init__(self, ontology, IRI=None):
+		super(OWLEntity, self).__init__(IRI)
+		self.__ont = ontology
+		self.__funcDict = {}
+		self.ontology.add(self.IRI, RDF.type, self.type)
 
 	@property
-	def subClasses(self):
+	def ontology(self):
+		return self.__ont
+
+	@property
+	def type(self):
 		raise NotImplementedError
+
+	@staticmethod
+	def checkOntology(func):
+		def wrapper(self, *args):
+			version, result = self.__funcDict.get(func, (-1, None))
+			if version < self.ontology.version:
+				result = func(self, *args)
+				self.__funcDict[func] = (self.ontology.version, result)
+			return result
+
+		return wrapper
+
+
+class OWLClass(OWLEntity):
+	@property
+	def type(self):
+		return OWL.Class
+
+	@property
+	@OWLEntity.checkOntology
+	def individuals(self):
+		return [OWLIndividual(self.ontology, s) for s, p, o in self.ontology.query(None, RDF.type, self.IRI)]
+
+	@property
+	@OWLEntity.checkOntology
+	def subClasses(self):
+		return [OWLClass(self.ontology, s) for s, p, o in self.ontology.query(None, RDFS.subClassOf, self.IRI)]
 
 	@property
 	def superClasses(self):
-		raise NotImplementedError
+		return [OWLClass(self.ontology, o) for s, p, o in self.ontology.query(self.IRI, RDFS.subClassOf, None)]
 
 
 class OWLIndividual(OWLEntity):
-	# set ontology
+	@property
+	def type(self):
+		return OWL.NamedIndividual
+
 	def getDataProperties(self, dataProperty=None):
 		raise NotImplementedError
 
@@ -99,37 +138,38 @@ class OWLObjectProperty(OWLProperty):
 		raise NotImplementedError
 
 
-class OWLOntology(OWLEntity):
-	_guessFormats = set(['n3'])  # TODO
-	_IRIDict = {}
+class OWLOntology(OWLObject):
+	__guessFormats = {'n3'}  # TODO
 
-	def __new__(cls, IRI=None, versionIRI=None):
-		self = super(OWLOntology, cls).__new__(cls)
-		if IRI:
-			ontDict = OWLOntology._IRIDict.get(IRI, {})
-			OWLOntology._IRIDict[IRI] = ontDict
-			self = ontDict.get(versionIRI, self)
-			ontDict[versionIRI] = self
-		return self
-
-	def __init__(self, IRI=None, versionIRI=None):
+	def __init__(self, IRI=None):
 		super(OWLOntology, self).__init__(IRI)
-		if not hasattr(self, 'graph'):
-			self.graph = Graph()
-			self.graph.add((self.IRI, RDF.type, OWL.Ontology))
-			if versionIRI:
-				self.graph.add((self.IRI, OWL.versionIRI, versionIRI))
-			self._directImports = None
+		self.__graph = Graph()
+		self.__version = 0
+		self.add(self.IRI, RDF.type, OWL.Ontology)
+
+	def __update(self):
+		self.__version += 1
+
+	@property
+	def version(self):
+		return self.__version
+
+	def add(self, s, p, o):
+		self.__graph.add((s, p, o))
+		self.__update()
+
+	def query(self, s, p, o):
+		return self.__graph.triples((s, p, o))
 
 	@staticmethod
-	def _load(file=None, location=None, data=None, owlFormat=None):
+	def __load(file=None, location=None, data=None, owlFormat=None):
 		if location and not owlFormat:
 			owlFormat = guess_format(location)
 		graph = Graph()
 		try:
 			return graph.parse(file=file, location=location, data=data, format=owlFormat)
 		except PluginException as e:
-			for f in OWLOntology._guessFormats:
+			for f in OWLOntology.__guessFormats:
 				try:
 					return graph.parse(file=file, location=location, data=data, format=f)
 				except PluginException:
@@ -138,7 +178,7 @@ class OWLOntology(OWLEntity):
 
 	@staticmethod
 	def load(file=None, location=None, data=None, owlFormat=None):
-		graph = OWLOntology._load(file, location, data, owlFormat)
+		graph = OWLOntology.__load(file, location, data, owlFormat)
 		maxNumOfTriples = 0
 		maxIRI = None
 		for IRI in graph.subjects(RDF.type, OWL.Ontology):
@@ -146,52 +186,42 @@ class OWLOntology(OWLEntity):
 			if maxNumOfTriples < len(triples):
 				maxNumOfTriples = len(triples)
 				maxIRI = IRI
-		if maxIRI in OWLOntology._IRIDict:
-			return OWLOntology(maxIRI)
-		else:
-			ont = OWLOntology(maxIRI)
-			ont.graph += graph
-			return ont
+		ont = OWLOntology(maxIRI)
+		ont.__graph = graph
+		ont.__update()
+		return ont
 
 	def save(self):
 		raise NotImplementedError
 
 	@property
 	def directImports(self):
-		if not self._directImports:
-			self._directImports = set()
-			for IRI in self.graph.objects(self.IRI, OWL.imports):
-				self._directImports.add(OWLOntology.load(location=IRI))
-		return self._directImports
+		raise NotImplementedError
 
 	@property
 	def imports(self):
-		imps = set()
-		for imp in self.directImports:
-			imps.add(imp)
-			imps |= imp.directImports
-		return imps
+		raise NotImplementedError
 
 	@property
 	def allEntities(self):
 		raise NotImplementedError
 
 	@property
-	def allClasses(self):
+	def classes(self):
+		return [OWLClass(self, s) for s, p, o in self.query(None, RDF.type, OWL.Class)]
+
+	@property
+	def individuals(self):
+		return [OWLIndividual(self, s) for s, p, o in self.query(None, RDF.type, OWL.NamedIndividual)]
+
+	@property
+	def dataProperties(self):
 		raise NotImplementedError
 
 	@property
-	def allIndividuals(self):
+	def objectProperties(self):
 		raise NotImplementedError
 
 	@property
-	def allDataProperties(self):
-		raise NotImplementedError
-
-	@property
-	def allObjectProperties(self):
-		raise NotImplementedError
-
-	@property
-	def allAnnotationProperties(self):
+	def annotationProperties(self):
 		raise NotImplementedError

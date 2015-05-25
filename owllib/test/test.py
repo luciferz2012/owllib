@@ -1,23 +1,22 @@
 from unittest import TestCase, main
 from codecs import open
 
+from rdflib import RDF, OWL
 from rdflib.term import URIRef
 
-from owllib.test.model import OWLOntology
+from owllib.test.model import OWLOntology, OWLClass
 
 
 class TestOntology(TestCase):
-	def test_new(self):
-		IRI = URIRef('a')
-		versionIRI = URIRef('b')
-		ont1 = OWLOntology(IRI)
-		ont2 = OWLOntology(IRI)
-		ont3 = OWLOntology(IRI, versionIRI)
-		self.assertEqual(ont1, ont2)
-		self.assertNotEqual(ont1, ont3)
-
 	def test_init(self):
 		OWLOntology()
+
+	def test_version(self):
+		ont = self.test_load()
+		v1 = ont.version
+		ont.add(ont.IRI, RDF.type, OWL.Class)
+		v2 = ont.version
+		self.assertNotEqual(v1, v2)
 
 	def test_load(self, location='../ont/test.n3'):
 		f = open(location, encoding='utf-8')
@@ -25,18 +24,49 @@ class TestOntology(TestCase):
 		f.close()
 		return ont
 
-	def test_load_same_IRI(self):
-		ont1 = OWLOntology.load(location='http://eulersharp.sourceforge.net/2003/03swap/workflow')
-		ont2 = OWLOntology.load(location='http://eulersharp.sourceforge.net/2003/03swap/workflow')
-		self.assertEqual(ont1, ont2)
+	def test_classes(self):
+		ont = self.test_load()
+		for c in ont.classes:
+			print(c)
 
-	def test_directImports(self):
-		ont = self.test_load('../ont/import.n3')
-		self.assertEqual(len(ont.directImports), 2)
+	def test_individual(self):
+		ont = self.test_load()
+		for i in ont.individuals:
+			print(i)
 
-	def test_imports(self):
-		ont = self.test_load('../ont/import.n3')
-		self.assertEqual(len(ont.imports), 2)
+
+class TestClass(TestCase):
+	@property
+	def ontology(self):
+		return TestOntology().test_load()
+
+	def test_init(self):
+		ont = OWLOntology()
+		IRI = URIRef('123')
+		c1 = OWLClass(ont, IRI)
+		c2 = OWLClass(ont, IRI)
+		c3 = OWLClass(ont, IRI)
+		for c in self.ontology.classes:
+			print(c)
+
+	def test_type(self):
+		cls = OWLClass(OWLOntology())
+		self.assertEqual(cls.type, OWL.Class)
+
+	def test_individuals(self):
+		for c in self.ontology.classes:
+			for i in c.individuals:
+				print(i)
+
+	def test_subClass(self):
+		for c in self.ontology.classes:
+			for s in c.subClasses:
+				print('%s is the sub class of %s' % (s, c))
+
+	def test_superClass(self):
+		for c in self.ontology.classes:
+			for s in c.superClasses:
+				print('%s is the super class of %s' % (s, c))
 
 
 if __name__ == '__main__':
