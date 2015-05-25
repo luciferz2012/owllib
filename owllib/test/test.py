@@ -43,9 +43,9 @@ class TestClass(TestCase):
 	def test_init(self):
 		ont = OWLOntology()
 		IRI = URIRef('123')
-		c1 = OWLClass(ont, IRI)
-		c2 = OWLClass(ont, IRI)
-		c3 = OWLClass(ont, IRI)
+		OWLClass(ont, IRI)
+		OWLClass(ont, IRI)
+		OWLClass(ont, IRI)
 		for c in self.ontology.classes:
 			print(c)
 

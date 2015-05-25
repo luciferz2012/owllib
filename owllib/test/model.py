@@ -7,45 +7,15 @@ from rdflib.util import guess_format
 from rdflib.plugin import PluginException
 
 
-class OWLObject:
-	def __init__(self, IRI=None):
+class OWLEntity():
+	def __init__(self, ontology, IRI=None):
+		self.__funcDict = {}
+		self.__ont = ontology
 		if IRI:
 			self.__IRI = IRI
 		else:
 			self.__IRI = BNode()
-
-	@property
-	def IRI(self):
-		return self.__IRI
-
-	def __str__(self):
-		return self.IRI
-
-	def getAnnotationProperties(self, annotationProperty=None):
-		raise NotImplementedError
-
-
-class OWLAnnotationProperty:
-	# isComment
-	# isDeprecated
-	# isLabel
-	pass
-
-
-class OWLEntity(OWLObject):
-	def __init__(self, ontology, IRI=None):
-		super(OWLEntity, self).__init__(IRI)
-		self.__ont = ontology
-		self.__funcDict = {}
 		self.ontology.add(self.IRI, RDF.type, self.type)
-
-	@property
-	def ontology(self):
-		return self.__ont
-
-	@property
-	def type(self):
-		raise NotImplementedError
 
 	@staticmethod
 	def checkOntology(func):
@@ -58,11 +28,29 @@ class OWLEntity(OWLObject):
 
 		return wrapper
 
+	@property
+	def ontology(self):
+		return self.__ont
+
+	@property
+	def IRI(self):
+		return self.__IRI
+
+	@property
+	def type(self):
+		raise NotImplementedError
+
+	def __str__(self):
+		return self.IRI
+
+	def getValues(self, key):
+		return [self.ontology.getValue(o) for s, p, o in self.ontology.query(self.IRI, key.IRI, None)]
+
 
 class OWLClass(OWLEntity):
 	@property
 	def type(self):
-		return OWL.Class
+		return OWL.Class  # TODO OWL.Restriction
 
 	@property
 	@OWLEntity.checkOntology
@@ -75,6 +63,7 @@ class OWLClass(OWLEntity):
 		return [OWLClass(self.ontology, s) for s, p, o in self.ontology.query(None, RDFS.subClassOf, self.IRI)]
 
 	@property
+	@OWLEntity.checkOntology
 	def superClasses(self):
 		return [OWLClass(self.ontology, o) for s, p, o in self.ontology.query(self.IRI, RDFS.subClassOf, None)]
 
@@ -84,15 +73,8 @@ class OWLIndividual(OWLEntity):
 	def type(self):
 		return OWL.NamedIndividual
 
-	def getDataProperties(self, dataProperty=None):
-		raise NotImplementedError
-
-	def getObjectProperties(self, objectProperty=None):
-		raise NotImplementedError
-
 
 class OWLProperty(OWLEntity):
-	# set ontologySet
 	@property
 	def domains(self):
 		raise NotImplementedError
@@ -138,21 +120,13 @@ class OWLObjectProperty(OWLProperty):
 		raise NotImplementedError
 
 
-class OWLOntology(OWLObject):
+class OWLOntology(OWLEntity):
 	__guessFormats = {'n3'}  # TODO
 
 	def __init__(self, IRI=None):
-		super(OWLOntology, self).__init__(IRI)
 		self.__graph = Graph()
 		self.__version = 0
-		self.add(self.IRI, RDF.type, OWL.Ontology)
-
-	def __update(self):
-		self.__version += 1
-
-	@property
-	def version(self):
-		return self.__version
+		super(OWLOntology, self).__init__(self, IRI)
 
 	def add(self, s, p, o):
 		self.__graph.add((s, p, o))
@@ -160,6 +134,17 @@ class OWLOntology(OWLObject):
 
 	def query(self, s, p, o):
 		return self.__graph.triples((s, p, o))
+
+	@property
+	def version(self):
+		return self.__version
+
+	def __update(self):
+		self.__version += 1
+
+	@property
+	def type(self):
+		return OWL.Ontology
 
 	@staticmethod
 	def __load(file=None, location=None, data=None, owlFormat=None):
@@ -194,34 +179,50 @@ class OWLOntology(OWLObject):
 	def save(self):
 		raise NotImplementedError
 
+	def getTypes(self, IRI):
+		return [o for s, p, o in self.query(IRI, RDF.type, None)]
+
+	def getValue(self, IRI):
+		types = self.getTypes(IRI)
+		if OWL.Ontology in types:
+			return OWLOntology(self, IRI)
+		if OWL.Class in types:
+			return OWLClass(self, IRI)
+		if OWL.NamedIndividual in types:
+			return OWLIndividual(self, IRI)
+		raise NotImplementedError
+
 	@property
+	@OWLEntity.checkOntology
 	def directImports(self):
 		raise NotImplementedError
 
 	@property
+	@OWLEntity.checkOntology
 	def imports(self):
 		raise NotImplementedError
 
 	@property
-	def allEntities(self):
+	@OWLEntity.checkOntology
+	def entities(self):
 		raise NotImplementedError
 
 	@property
+	@OWLEntity.checkOntology
 	def classes(self):
 		return [OWLClass(self, s) for s, p, o in self.query(None, RDF.type, OWL.Class)]
 
 	@property
+	@OWLEntity.checkOntology
 	def individuals(self):
 		return [OWLIndividual(self, s) for s, p, o in self.query(None, RDF.type, OWL.NamedIndividual)]
 
 	@property
+	@OWLEntity.checkOntology
 	def dataProperties(self):
 		raise NotImplementedError
 
 	@property
+	@OWLEntity.checkOntology
 	def objectProperties(self):
-		raise NotImplementedError
-
-	@property
-	def annotationProperties(self):
 		raise NotImplementedError
