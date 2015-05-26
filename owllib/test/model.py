@@ -272,27 +272,12 @@ class OWLOntology(OWLEntity):
 		ont = OWLOntology(maxIRI, graph)
 		return ont
 
-	def save(self):
-		raise NotImplementedError
+	def save(self, filename, owlFormat):
+		self.__graph.serialize(filename, owlFormat)
 
 	@OWLEntity.checkIRI
 	def getTypes(self, entity):
 		return [o for s, p, o in self.query(entity.IRI, RDF.type, None)]
-
-	# @property
-	# @OWLEntity.checkOntology
-	# def directImports(self):
-	# raise NotImplementedError
-	#
-	# @property
-	# @OWLEntity.checkOntology
-	# def imports(self):
-	# raise NotImplementedError
-	#
-	# @property
-	# @OWLEntity.checkOntology
-	# def entities(self):
-	# raise NotImplementedError
 
 	@property
 	@OWLEntity.checkOntology

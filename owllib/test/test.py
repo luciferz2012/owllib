@@ -3,7 +3,6 @@ from codecs import open
 from logging import basicConfig, INFO, info
 
 from rdflib import RDF, OWL
-
 from rdflib.term import URIRef
 
 from owllib.test.model import OWLOntology, OWLClass, OWLIndividual, OWLDataProperty, OWLObjectProperty
@@ -158,6 +157,11 @@ class TestOntology(TestCase):
 		ont = OWLOntology.load(file=f, owlFormat='n3')
 		f.close()
 		return ont
+
+	def test_save(self):
+		ont = Ont()
+		OWLClass(ont, URIRef('AddedClass'))
+		ont.save('../ont/save.n3', 'n3')
 
 	def test_classes(self):
 		for c in Ont().classes:
