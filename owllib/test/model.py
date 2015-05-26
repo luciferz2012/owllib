@@ -1,5 +1,7 @@
 # coding=utf-8
 
+from logging import debug
+
 from rdflib import Graph
 from rdflib.term import BNode
 from rdflib import RDF, RDFS, OWL
@@ -7,29 +9,57 @@ from rdflib.util import guess_format
 from rdflib.plugin import PluginException
 
 
-class OWLEntity():
-	def __init__(self, ontology, IRI=None):
+class OWLEntity:
+	def __init__(self, ontology, IRI=None, new=True):
 		self.__funcDict = {}
+		self.__sync = 0
 		self.__ont = ontology
-		if IRI:
-			self.__IRI = IRI
-		else:
+		self.__IRI = IRI
+		if not IRI:
 			self.__IRI = BNode()
-		self.ontology.add(self.IRI, RDF.type, self.type)
+		if new:
+			self.ont.add(self.IRI, RDF.type, self.type)
+
+	@staticmethod
+	def check(func):
+		def wrapper(self, *args):
+			if self.__sync < self.ont.version:
+				self.__funcDict = {}
+				self.__sync = self.ont.version
+			return func(self, *args)
+
+		return wrapper
 
 	@staticmethod
 	def checkOntology(func):
-		def wrapper(self, *args):
-			version, result = self.__funcDict.get(func, (-1, None))
-			if version < self.ontology.version:
-				result = func(self, *args)
-				self.__funcDict[func] = (self.ontology.version, result)
+		@OWLEntity.check
+		def wrapper(self):
+			if func in self.__funcDict:
+				return self.__funcDict[func]
+			debug('run: ' + str(func))
+			result = func(self)
+			self.__funcDict[func] = result
+			return result
+
+		return wrapper
+
+	@staticmethod
+	def checkIRI(func):
+		@OWLEntity.check
+		def wrapper(self, entity):
+			IRIDict = self.__funcDict.get(func, {})
+			if entity.IRI in IRIDict:
+				return IRIDict[entity.IRI]
+			debug('run: ' + str(func) + ', IRI: ' + str(entity.IRI))
+			result = func(self, entity)
+			IRIDict[entity.IRI] = result
+			self.__funcDict[func] = IRIDict
 			return result
 
 		return wrapper
 
 	@property
-	def ontology(self):
+	def ont(self):
 		return self.__ont
 
 	@property
@@ -43,29 +73,32 @@ class OWLEntity():
 	def __str__(self):
 		return self.IRI
 
-	def getValues(self, key):
-		return [self.ontology.getValue(o) for s, p, o in self.ontology.query(self.IRI, key.IRI, None)]
-
 
 class OWLClass(OWLEntity):
+	def __init__(self, ontology, IRI=None, new=True):
+		self.__type = OWL.Class
+		if not IRI or isinstance(IRI, BNode):
+			self.__type = OWL.Restriction
+		super(OWLClass, self).__init__(ontology, IRI, new)
+
 	@property
 	def type(self):
-		return OWL.Class  # TODO OWL.Restriction
+		return self.__type
 
 	@property
 	@OWLEntity.checkOntology
 	def individuals(self):
-		return [OWLIndividual(self.ontology, s) for s, p, o in self.ontology.query(None, RDF.type, self.IRI)]
+		return [OWLIndividual(self.ont, s, False) for s, p, o in self.ont.query(None, RDF.type, self.IRI)]
 
 	@property
 	@OWLEntity.checkOntology
 	def subClasses(self):
-		return [OWLClass(self.ontology, s) for s, p, o in self.ontology.query(None, RDFS.subClassOf, self.IRI)]
+		return [OWLClass(self.ont, s, False) for s, p, o in self.ont.query(None, RDFS.subClassOf, self.IRI)]
 
 	@property
 	@OWLEntity.checkOntology
 	def superClasses(self):
-		return [OWLClass(self.ontology, o) for s, p, o in self.ontology.query(self.IRI, RDFS.subClassOf, None)]
+		return [OWLClass(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, RDFS.subClassOf, None)]
 
 
 class OWLIndividual(OWLEntity):
@@ -73,58 +106,121 @@ class OWLIndividual(OWLEntity):
 	def type(self):
 		return OWL.NamedIndividual
 
+	@OWLEntity.checkIRI
+	def getDataPropertyValues(self, dataProperty):
+		return [o for s, p, o in self.ont.query(self.IRI, dataProperty.IRI, None)]
+
+	@OWLEntity.checkIRI
+	def getObjectPropertyValues(self, objectProperty):
+		return [OWLIndividual(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, objectProperty.IRI, None)]
+
 
 class OWLProperty(OWLEntity):
 	@property
+	@OWLEntity.checkOntology
 	def domains(self):
-		raise NotImplementedError
+		return [OWLClass(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, RDFS.domain, None)]
 
 	@property
+	@OWLEntity.checkOntology
 	def ranges(self):
 		raise NotImplementedError
 
 	@property
+	@OWLEntity.checkOntology
 	def subProperties(self):
 		raise NotImplementedError
 
 	@property
+	@OWLEntity.checkOntology
 	def superProperties(self):
 		raise NotImplementedError
 
+	@property
+	def functional(self):
+		return OWL.FunctionalProperty in self.ont.getTypes(self)
+
 
 class OWLDataProperty(OWLProperty):
-	pass
+	@property
+	def type(self):
+		return OWL.DatatypeProperty
+
+	@property
+	@OWLEntity.checkOntology
+	def ranges(self):
+		return [o for s, p, o in self.ont.query(self.IRI, RDFS.range, None)]
+
+	@property
+	@OWLEntity.checkOntology
+	def subProperties(self):
+		return [OWLDataProperty(self.ont, s, False) for s, p, o in self.ont.query(None, RDFS.subPropertyOf, self.IRI)]
+
+	@property
+	@OWLEntity.checkOntology
+	def superProperties(self):
+		return [OWLDataProperty(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, RDFS.subPropertyOf, None)]
 
 
 class OWLObjectProperty(OWLProperty):
 	@property
+	def type(self):
+		return OWL.ObjectProperty
+
+	@property
+	@OWLEntity.checkOntology
+	def ranges(self):
+		return [OWLClass(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, RDFS.range, None)]
+
+	@property
+	@OWLEntity.checkOntology
+	def subProperties(self):
+		return [OWLObjectProperty(self.ont, s, False) for s, p, o in self.ont.query(None, RDFS.subPropertyOf, self.IRI)]
+
+	@property
+	@OWLEntity.checkOntology
+	def superProperties(self):
+		return [OWLObjectProperty(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, RDFS.subPropertyOf, None)]
+
+	@property
+	@OWLEntity.checkOntology
 	def inverses(self):
-		raise NotImplementedError
+		p1 = [OWLObjectProperty(self.ont, o, False) for s, p, o in self.ont.query(self.IRI, OWL.inverseOf, None)]
+		p2 = [OWLObjectProperty(self.ont, s, False) for s, p, o in self.ont.query(None, OWL.inverseOf, self.IRI)]
+		return p1 + p2
 
-	def isAsymmetric(self):
-		raise NotImplementedError
+	@property
+	def asymmetric(self):
+		return OWL.AsymmetricProperty in self.ont.getTypes(self)
 
-	def isInverseFunctional(self):
-		raise NotImplementedError
+	@property
+	def inverseFunctional(self):
+		return OWL.InverseFunctionalProperty in self.ont.getTypes(self)
 
-	def isIrreflexive(self):
-		raise NotImplementedError
+	@property
+	def irreflexive(self):
+		return OWL.IrreflexiveProperty in self.ont.getTypes(self)
 
-	def isReflexive(self):
-		raise NotImplementedError
+	@property
+	def reflexive(self):
+		return OWL.ReflexiveProperty in self.ont.getTypes(self)
 
-	def isSymmetric(self):
-		raise NotImplementedError
+	@property
+	def symmetric(self):
+		return OWL.SymmetricProperty in self.ont.getTypes(self)
 
-	def isTransitive(self):
-		raise NotImplementedError
+	@property
+	def transitive(self):
+		return OWL.TransitiveProperty in self.ont.getTypes(self)
 
 
 class OWLOntology(OWLEntity):
 	__guessFormats = {'n3'}  # TODO
 
-	def __init__(self, IRI=None):
-		self.__graph = Graph()
+	def __init__(self, IRI=None, graph=None):
+		self.__graph = graph
+		if not graph:
+			self.__graph = Graph()
 		self.__version = 0
 		super(OWLOntology, self).__init__(self, IRI)
 
@@ -167,62 +263,53 @@ class OWLOntology(OWLEntity):
 		maxNumOfTriples = 0
 		maxIRI = None
 		for IRI in graph.subjects(RDF.type, OWL.Ontology):
-			triples = [(p, o) for (p, o) in graph.predicate_objects(IRI)]
+			triples = [(p, o) for p, o in graph.predicate_objects(IRI)]
 			if maxNumOfTriples < len(triples):
 				maxNumOfTriples = len(triples)
 				maxIRI = IRI
-		ont = OWLOntology(maxIRI)
-		ont.__graph = graph
-		ont.__update()
+		ont = OWLOntology(maxIRI, graph)
 		return ont
 
 	def save(self):
 		raise NotImplementedError
 
-	def getTypes(self, IRI):
-		return [o for s, p, o in self.query(IRI, RDF.type, None)]
+	@OWLEntity.checkIRI
+	def getTypes(self, entity):
+		return [o for s, p, o in self.query(entity.IRI, RDF.type, None)]
 
-	def getValue(self, IRI):
-		types = self.getTypes(IRI)
-		if OWL.Ontology in types:
-			return OWLOntology(self, IRI)
-		if OWL.Class in types:
-			return OWLClass(self, IRI)
-		if OWL.NamedIndividual in types:
-			return OWLIndividual(self, IRI)
-		raise NotImplementedError
-
-	@property
-	@OWLEntity.checkOntology
-	def directImports(self):
-		raise NotImplementedError
-
-	@property
-	@OWLEntity.checkOntology
-	def imports(self):
-		raise NotImplementedError
-
-	@property
-	@OWLEntity.checkOntology
-	def entities(self):
-		raise NotImplementedError
+	# @property
+	# @OWLEntity.checkOntology
+	# def directImports(self):
+	# raise NotImplementedError
+	#
+	# @property
+	# @OWLEntity.checkOntology
+	# def imports(self):
+	# raise NotImplementedError
+	#
+	# @property
+	# @OWLEntity.checkOntology
+	# def entities(self):
+	# raise NotImplementedError
 
 	@property
 	@OWLEntity.checkOntology
 	def classes(self):
-		return [OWLClass(self, s) for s, p, o in self.query(None, RDF.type, OWL.Class)]
+		owlClasses = [OWLClass(self, s, False) for s, p, o in self.query(None, RDF.type, OWL.Class)]
+		owlRestrictions = [OWLClass(self, s, False) for s, p, o in self.query(None, RDF.type, OWL.Restriction)]
+		return owlClasses + owlRestrictions
 
 	@property
 	@OWLEntity.checkOntology
 	def individuals(self):
-		return [OWLIndividual(self, s) for s, p, o in self.query(None, RDF.type, OWL.NamedIndividual)]
+		return [OWLIndividual(self, s, False) for s, p, o in self.query(None, RDF.type, OWL.NamedIndividual)]
 
 	@property
 	@OWLEntity.checkOntology
 	def dataProperties(self):
-		raise NotImplementedError
+		return [OWLDataProperty(self, s, False) for s, p, o in self.query(None, RDF.type, OWL.DatatypeProperty)]
 
 	@property
 	@OWLEntity.checkOntology
 	def objectProperties(self):
-		raise NotImplementedError
+		return [OWLObjectProperty(self, s, False) for s, p, o in self.query(None, RDF.type, OWL.ObjectProperty)]

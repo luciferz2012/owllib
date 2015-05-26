@@ -11,6 +11,44 @@
 
 #################################################################
 #
+#    Object Properties
+#
+#################################################################
+
+
+###  http://www.semanticweb.org/luciferz2012/ontologies/2015/0/untitled-ontology-75#propertyA
+
+:propertyA rdf:type owl:AsymmetricProperty ,
+                    owl:FunctionalProperty ,
+                    owl:InverseFunctionalProperty ,
+                    owl:IrreflexiveProperty ,
+                    owl:ObjectProperty ,
+                    owl:ReflexiveProperty ,
+                    owl:SymmetricProperty ,
+                    owl:TransitiveProperty ;
+           
+           owl:inverseOf :propertyB .
+
+
+
+###  http://www.semanticweb.org/luciferz2012/ontologies/2015/0/untitled-ontology-75#propertyB
+
+:propertyB rdf:type owl:ObjectProperty .
+
+
+
+###  http://www.semanticweb.org/luciferz2012/ontologies/2015/0/untitled-ontology-75#propertyC
+
+:propertyC rdf:type owl:ObjectProperty ;
+           
+           rdfs:subPropertyOf :propertyA .
+
+
+
+
+
+#################################################################
+#
 #    Data properties
 #
 #################################################################
@@ -18,7 +56,20 @@
 
 ###  http://www.semanticweb.org/luciferz2012/ontologies/2015/0/untitled-ontology-75#TestProperty
 
-:TestProperty rdf:type owl:DatatypeProperty .
+:TestProperty rdf:type owl:DatatypeProperty ;
+              
+              rdfs:domain :c1 ;
+              
+              rdfs:range xsd:int ;
+              
+              rdfs:domain [ rdf:type owl:Restriction ;
+                            owl:onProperty owl:topObjectProperty ;
+                            owl:someValuesFrom :c1
+                          ] ,
+                          [ rdf:type owl:Restriction ;
+                            owl:onProperty owl:topDataProperty ;
+                            owl:someValuesFrom xsd:boolean
+                          ] .
 
 
 
@@ -77,7 +128,9 @@
              
              rdfs:comment "For test"^^xsd:string ;
              
-             :TestProperty "no" .
+             :TestProperty "no" ;
+             
+             :propertyB :individual1 .
 
 
 
