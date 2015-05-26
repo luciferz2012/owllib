@@ -12,7 +12,7 @@ from rdflib.plugin import PluginException
 class OWLEntity:
 	def __init__(self, ontology, IRI=None, new=True):
 		self.__funcDict = {}
-		self.__sync = 0
+		self.__version = 0
 		self.__ont = ontology
 		self.__IRI = IRI
 		if not IRI:
@@ -23,9 +23,10 @@ class OWLEntity:
 	@staticmethod
 	def check(func):
 		def wrapper(self, *args):
-			if self.__sync < self.ont.version:
+			version = self.ont.getVersion(self.IRI)
+			if self.__version < version:
 				self.__funcDict = {}
-				self.__sync = self.ont.version
+				self.__version = version
 			return func(self, *args)
 
 		return wrapper
@@ -221,22 +222,23 @@ class OWLOntology(OWLEntity):
 		self.__graph = graph
 		if not graph:
 			self.__graph = Graph()
-		self.__version = 0
+		self.__IRIDict = {}
 		super(OWLOntology, self).__init__(self, IRI)
 
 	def add(self, s, p, o):
 		self.__graph.add((s, p, o))
-		self.__update()
+		self.__update(s)
+		self.__update(p)
 
 	def query(self, s, p, o):
 		return self.__graph.triples((s, p, o))
 
-	@property
-	def version(self):
-		return self.__version
+	def getVersion(self, IRI):
+		return self.__IRIDict.get(IRI, 0)
 
-	def __update(self):
-		self.__version += 1
+	def __update(self, IRI):
+		self.__IRIDict[IRI] = self.getVersion(IRI) + 1
+		self.__IRIDict[self.IRI] = self.getVersion(self.IRI) + 1
 
 	@property
 	def type(self):

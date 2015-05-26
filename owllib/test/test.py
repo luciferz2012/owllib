@@ -143,9 +143,14 @@ class TestOntology(TestCase):
 
 	def test_version(self):
 		ont = self.test_load()
-		v1 = ont.version
-		ont.add(ont.IRI, RDF.type, OWL.Class)
-		v2 = ont.version
+		cls = OWLClass(ont)
+		o1 = ont.getVersion(ont.IRI)
+		v1 = ont.getVersion(cls.IRI)
+		ont.add(cls.IRI, RDF.type, OWL.Class)
+		o2 = ont.getVersion(ont.IRI)
+		v2 = ont.getVersion(cls.IRI)
+		info((o1, o2, v1, v2))
+		self.assertNotEqual(o1, o2)
 		self.assertNotEqual(v1, v2)
 
 	def test_load(self, location='../ont/test.n3'):
